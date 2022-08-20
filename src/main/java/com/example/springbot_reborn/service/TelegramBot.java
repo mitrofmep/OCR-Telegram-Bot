@@ -81,7 +81,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public java.io.File downloadPhotoByFilePath(String filePath) {
         try {
-            return downloadFile(filePath, new java.io.File("src/photos/photo.jpg"));
+            return downloadFile(filePath, new java.io.File("src/main/resources/photos/photo.jpg"));
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
@@ -90,7 +90,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public void tesseractPhoto(java.io.File resultFile, Update update) {
         Tesseract instance = new Tesseract();
-        instance.setDatapath("src/tessdata");
+        instance.setDatapath("src/main/resources/tessdata");
         instance.setLanguage("eng");
         try {
             String result = instance.doOCR(resultFile);
