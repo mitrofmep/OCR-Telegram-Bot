@@ -122,9 +122,13 @@ public class TelegramBot extends TelegramLongPollingBot {
             throws IOException {
         String file ="src/main/resources/photos/output.txt";
         BufferedReader reader = new BufferedReader(new FileReader(file));
-        String currentLine = reader.readLine();
-        System.out.println(currentLine);
-        sendMessage(update.getMessage().getChatId(), currentLine);
+        StringBuilder builder = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            builder.append(line);
+            builder.append(" \n");
+        }
+        sendMessage(update.getMessage().getChatId(), builder.toString());
         reader.close();
     }
 }
