@@ -1,8 +1,8 @@
 package com.example.springbot_reborn.service;
 
 import com.example.springbot_reborn.config.BotConfig;
-import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
+//import net.sourceforge.tess4j.Tesseract;
+//import net.sourceforge.tess4j.TesseractException;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
@@ -12,6 +12,9 @@ import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -45,7 +48,11 @@ public class TelegramBot extends TelegramLongPollingBot {
             PhotoSize photo = getPhoto(update);
             String photoPath = getFilePath(photo);
             java.io.File resultFile = downloadPhotoByFilePath(photoPath);
-            tesseractPhoto(resultFile, update);
+            try {
+                tesseractPhotoCMD(resultFile, update);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -83,19 +90,41 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             return downloadFile(filePath, new java.io.File("src/main/resources/photos/photo.jpg"));
         } catch (TelegramApiException e) {
+
             e.printStackTrace();
         }
         return null;
     }
 
-    public void tesseractPhoto(java.io.File resultFile, Update update) {
-        Tesseract instance = new Tesseract();
-        instance.setDatapath("src/main/resources/tessdata");
-        try {
-            String result = instance.doOCR(resultFile);
-            sendMessage(update.getMessage().getChatId(), result);
-        } catch (TesseractException e) {
+//    public void tesseractPhoto(java.io.File resultFile, Update update) {
+//        Tesseract instance = new Tesseract();
+//        instance.setDatapath("src/main/resources/tessdata");
+//        try {
+//            String result = instance.doOCR(resultFile);
+//            sendMessage(update.getMessage().getChatId(), result);
+//        } catch (TesseractException e) {
+//
+//        }
+//    }
 
+    public void tesseractPhotoCMD(java.io.File resultFile, Update update) throws IOException {
+        String cmd = "tesseract src/main/resources/photos/photo.jpg output.txt";
+        Process process = new ProcessBuilder("tesseract", "src/main/resources/photos/photo.jpg", "src/main/resources/photos/output").start();
+        try {
+            process.waitFor();
+            whenReadWithBufferedReader_thenCorrect(update);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
+    }
+
+    public void whenReadWithBufferedReader_thenCorrect(Update update)
+            throws IOException {
+        String file ="src/main/resources/photos/output.txt";
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        String currentLine = reader.readLine();
+        System.out.println(currentLine);
+        sendMessage(update.getMessage().getChatId(), currentLine);
+        reader.close();
     }
 }
