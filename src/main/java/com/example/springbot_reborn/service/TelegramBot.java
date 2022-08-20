@@ -91,7 +91,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void tesseractPhoto(java.io.File resultFile, Update update) {
         Tesseract instance = new Tesseract();
         instance.setDatapath("src/main/resources/tessdata");
-        instance.setLanguage("eng");
         try {
             String result = instance.doOCR(resultFile);
             sendMessage(update.getMessage().getChatId(), result);
