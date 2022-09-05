@@ -164,32 +164,36 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public java.io.File downloadPhotoByFilePath(String filePath, String fileNameSuffix) {
         try {
-            return downloadFile(filePath, new java.io.File("src/main/resources/photos/photo.jpg"));
+            java.io.File file1 = new java.io.File("/app/src/main/resources/photos", "photo.jpg");
+            file1.createNewFile();
+            return downloadFile(filePath, file1);
         } catch (TelegramApiException e) {
 
             e.printStackTrace();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
         return null;
     }
 
 
     public void tesseractPhotoCMD(java.io.File resultFile, Update update) throws IOException {
-        Process process = new ProcessBuilder("tesseract",
+        Process process = new ProcessBuilder("tesseract", "--tessdata-dir /app/src/main/resources/tessdata",
                 resultFile.getPath(),
-                resultFile.getPath().substring(0, resultFile.getPath().length() - 3), "-l",
+                "src/main/resources/output", "-l",
                 users.get(update.getMessage().getChatId().toString())).start();
         System.out.println("tesseracting here to " + resultFile.getPath());
         try {
             process.waitFor();
-            whenReadWithBufferedReader_thenCorrect(update, resultFile.getPath().substring(0, resultFile.getPath().length() - 3));
+            whenReadWithBufferedReader_thenCorrect(update);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void whenReadWithBufferedReader_thenCorrect(Update update, String path)
+    public void whenReadWithBufferedReader_thenCorrect(Update update)
             throws IOException {
-        String file = path + "txt";
+        String file = "src/main/resources/output.txt";
         System.out.println("file here is " + file);
         BufferedReader reader = new BufferedReader(new FileReader(file));
         StringBuilder builder = new StringBuilder();
