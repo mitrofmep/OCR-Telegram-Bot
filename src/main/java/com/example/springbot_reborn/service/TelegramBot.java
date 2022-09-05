@@ -57,7 +57,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else if (update.hasCallbackQuery()) {
             String lang = update.getCallbackQuery().getData();
             System.out.println("lang is " + lang);
+            System.out.println("keys are " + users.keySet().toString() + " and values are " + users.values().toString());
             users.put(update.getCallbackQuery().getFrom().getId().toString(), lang);
+            System.out.println("keys are " + users.keySet().toString() + " and values are " + users.values().toString());
             sendMessage(update.getCallbackQuery().getFrom().getId(), "Отлично! Теперь отправьте мне изображение");
         }
 
@@ -162,7 +164,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public java.io.File downloadPhotoByFilePath(String filePath, String fileNameSuffix) {
         try {
-            return downloadFile(filePath, new java.io.File("app/src/main/resources/photos/photo" + fileNameSuffix + ".jpg"));
+            return downloadFile(filePath, new java.io.File("src/main/resources/photos/photo.jpg"));
         } catch (TelegramApiException e) {
 
             e.printStackTrace();
@@ -174,11 +176,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void tesseractPhotoCMD(java.io.File resultFile, Update update) throws IOException {
         Process process = new ProcessBuilder("tesseract",
                 resultFile.getPath(),
-                resultFile.getPath(), "-l",
+                resultFile.getPath().substring(0, resultFile.getPath().length() - 3), "-l",
                 users.get(update.getMessage().getChatId().toString())).start();
+        System.out.println("tesseracting here to " + resultFile.getPath());
         try {
             process.waitFor();
-            whenReadWithBufferedReader_thenCorrect(update, resultFile.getPath());
+            whenReadWithBufferedReader_thenCorrect(update, resultFile.getPath().substring(0, resultFile.getPath().length() - 3));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -186,7 +189,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public void whenReadWithBufferedReader_thenCorrect(Update update, String path)
             throws IOException {
-        String file = path + ".txt";
+        String file = path + "txt";
+        System.out.println("file here is " + file);
         BufferedReader reader = new BufferedReader(new FileReader(file));
         StringBuilder builder = new StringBuilder();
         String line;
