@@ -9,10 +9,9 @@ import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.File;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.PhotoSize;
-import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -56,22 +55,19 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         } else if (update.hasCallbackQuery()) {
             String lang = update.getCallbackQuery().getData();
-            System.out.println("lang is " + lang);
-            System.out.println("keys are " + users.keySet().toString() + " and values are " + users.values().toString());
             users.put(update.getCallbackQuery().getFrom().getId().toString(), lang);
-            System.out.println("keys are " + users.keySet().toString() + " and values are " + users.values().toString());
             sendMessage(update.getCallbackQuery().getFrom().getId(), "Отлично! Теперь отправьте мне изображение");
         }
 
         if (update.hasMessage() && update.getMessage().hasPhoto()) {
             if (!users.containsKey(update.getMessage().getChatId().toString())) {
-                sendMessage(update.getMessage().getChatId(), "Сначала отправьте мне команду /start");
+                sendMessage(update.getMessage().getChatId(), "Сначала отправьте мне команду /start и выберите язык");
             } else {
                 SendChatAction sendChatAction = new SendChatAction();
                 sendChatAction.setAction(ActionType.TYPING);
                 sendChatAction.setChatId(update.getMessage().getChatId());
                 try {
-                    Boolean wasSuccessfull = execute(sendChatAction);
+                    execute(sendChatAction);
                     photoReceived(update);
                 } catch (TelegramApiException e) {
                     e.printStackTrace();
@@ -85,7 +81,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         PhotoSize photo = getPhoto(update);
         String photoPath = getFilePath(photo);
         Random rand = new Random();
-        String fileNameSuffix = String.valueOf(rand.nextInt(1000));
+        String fileNameSuffix = String.valueOf(rand.nextInt(10000));
         java.io.File resultFile = downloadPhotoByFilePath(photoPath, fileNameSuffix);
         System.out.println("abs path is " + resultFile.getAbsolutePath());
         System.out.println("path is " + resultFile.getPath());
@@ -100,32 +96,26 @@ public class TelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(update.getMessage().getChatId());
         message.setText("Выберите язык текста на вашем изображении");
-
-        // Create InlineKeyboardMarkup object
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        // Create the keyboard (list of InlineKeyboardButton list)
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        // Create a list for buttons
         List<InlineKeyboardButton> Buttons = new ArrayList<InlineKeyboardButton>();
-        // Initialize each button, the text must be written
         InlineKeyboardButton en= new InlineKeyboardButton("EN");
-        // Also must use exactly one of the optional fields,it can edit  by set method
         en.setCallbackData("eng");
-        // Add button to the list
         Buttons.add(en);
-        // Initialize each button, the text must be written
         InlineKeyboardButton ru= new InlineKeyboardButton("RU");
-        // Also must use exactly one of the optional fields,it can edit  by set method
         ru.setCallbackData("rus");
-        // Add button to the list
         Buttons.add(ru);
+        InlineKeyboardButton fr= new InlineKeyboardButton("FR");
+        fr.setCallbackData("fra");
+        Buttons.add(fr);
+        InlineKeyboardButton kz= new InlineKeyboardButton("KZ");
+        kz.setCallbackData("kaz");
+        Buttons.add(kz);
         keyboard.add(Buttons);
         inlineKeyboardMarkup.setKeyboard(keyboard);
-        // Add it to the message
         message.setReplyMarkup(inlineKeyboardMarkup);
 
         try {
-            // Send the message
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
@@ -163,56 +153,47 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public java.io.File downloadPhotoByFilePath(String filePath, String fileNameSuffix) {
+        String pathName = "/app/src/photo_" + fileNameSuffix + ".jpg";
         try {
-            java.io.File file1 = new java.io.File("/app/src/main/resources/photos", "photo.jpg");
-            System.out.println("file created : " + file1.createNewFile());
+            java.io.File file1 = new java.io.File(pathName);
             return downloadFile(filePath, file1);
         } catch (TelegramApiException e) {
 
             e.printStackTrace();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
         return null;
     }
 
 
     public void tesseractPhotoCMD(java.io.File resultFile, Update update) throws IOException {
-        Process process = new ProcessBuilder("tesseract", "--tessdata-dir /app/src/main/resources/tessdata/",
+        StringBuilder strB = new StringBuilder();
+        java.io.File outputFile = new java.io.File(resultFile.getParentFile(), "output");
+        ProcessBuilder pb = new ProcessBuilder("tesseract",
+                "--tessdata-dir",
+                "/app/src/main/resources/tessdata/",
                 resultFile.getPath(),
-                "-", "-l",
-                users.get(update.getMessage().getChatId().toString())).start();
-        System.out.println("proc info before " + process.info());
-        System.out.println("tesseracting here to " + resultFile.getPath());
-        System.out.println(users.get(update.getMessage().getChatId().toString()));
-
+                outputFile.getName(),
+                "-l",
+                users.get(update.getMessage().getChatId().toString()));
+        pb.directory(resultFile.getParentFile());
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
         try {
             process.waitFor();
-            System.out.println("exit code is " + process.exitValue());
-            InputStream stream = process.getInputStream();
-            String text = new BufferedReader(
-                    new InputStreamReader(stream, StandardCharsets.UTF_8))
-                    .lines()
-                    .collect(Collectors.joining(" "));
-            sendMessage(update.getMessage().getChatId(), text);
+            BufferedReader in = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(outputFile.getAbsolutePath() + ".txt"),
+                    "UTF-8"));
+            String str;
+
+            while ((str = in.readLine()) != null)
+            {
+                strB.append(str).append(" ");
+            }
+            in.close();
+            sendMessage(update.getMessage().getChatId(), strB.toString());
             sendInlineKeyboard(update);
-            //whenReadWithBufferedReader_thenCorrect(update);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public void whenReadWithBufferedReader_thenCorrect(Update update)
-            throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader("output.txt"));
-        StringBuilder builder = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            builder.append(line);
-            builder.append(" ");
-        }
-        sendMessage(update.getMessage().getChatId(), builder.toString());
-        reader.close();
-        sendInlineKeyboard(update);
     }
 }
