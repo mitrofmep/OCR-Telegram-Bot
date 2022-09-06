@@ -178,7 +178,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
     public void tesseractPhotoCMD(java.io.File resultFile, Update update) throws IOException {
-        Process process = new ProcessBuilder("tesseract",
+        Process process = new ProcessBuilder("tesseract", "--tessdata-dir /app/src/main/resources/tessdata/",
                 resultFile.getPath(),
                 "-", "-l",
                 users.get(update.getMessage().getChatId().toString())).start();
@@ -193,9 +193,10 @@ public class TelegramBot extends TelegramLongPollingBot {
             String text = new BufferedReader(
                     new InputStreamReader(stream, StandardCharsets.UTF_8))
                     .lines()
-                    .collect(Collectors.joining("\n"));
-            System.out.println(text);
-            whenReadWithBufferedReader_thenCorrect(update);
+                    .collect(Collectors.joining(" "));
+            sendMessage(update.getMessage().getChatId(), text);
+            sendInlineKeyboard(update);
+            //whenReadWithBufferedReader_thenCorrect(update);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
