@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -25,7 +26,7 @@ import java.util.stream.Collectors;
 
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
-    private HashMap<String, String> users = new HashMap<>();
+    private HashMap<String, String> userLangSetup = new HashMap<>();
 
     final BotConfig config;
 
@@ -45,23 +46,31 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage() && update.getMessage().hasText()) {
+        if (update.hasMessage()) {
             Message message = update.getMessage();
-            String text = message.getText();
-            if (text.equals("/start")) {
-                sendInlineKeyboard(update);
-            } else sendMessage(update.getMessage().getChatId(), "Извините, команда не распознана. " +
-                    "Для начала работы отправьте /start");
 
-        } else if (update.hasCallbackQuery()) {
-            String lang = update.getCallbackQuery().getData();
-            users.put(update.getCallbackQuery().getFrom().getId().toString(), lang);
-            sendMessage(update.getCallbackQuery().getFrom().getId(), "Отлично! Теперь отправьте мне изображение");
-        }
+            if (message.hasText()) {
+                String input = message.getText();
 
-        if (update.hasMessage() && update.getMessage().hasPhoto()) {
-            if (!users.containsKey(update.getMessage().getChatId().toString())) {
-                sendMessage(update.getMessage().getChatId(), "Сначала отправьте мне команду /start и выберите язык");
+                if (input.equals("/start")) {
+                    SendMessage sendMessage = SendMessage
+                            .builder()
+                            .text("Что нужно сделать?")
+                            .chatId(message.getChatId())
+                            .replyMarkup(startCommandReplyMarkup())
+                            .build();
+                    try {
+                        execute(sendMessage);
+                    } catch (TelegramApiException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+
+            if (update.hasMessage() && update.getMessage().hasPhoto()) {
+            if (!userLangSetup.containsKey(update.getMessage().getChatId().toString())) {
+                sendMessage(update.getMessage().getChatId(), "У вас еще не выбран язык текста для оцифровки. " +
+                        "Сначала выберите соответствующий пункт в меню по команде /start");
             } else {
                 SendChatAction sendChatAction = new SendChatAction();
                 sendChatAction.setAction(ActionType.TYPING);
@@ -74,6 +83,124 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
             }
         }
+        }
+        else if (update.hasCallbackQuery()) {
+            CallbackQuery callbackQuery = update.getCallbackQuery();
+            String[] data = callbackQuery.getData().split(":");
+            InlineKeyboardMarkup markup = null;
+            String editedText = null;
+            if (data[0].equals("start")) {
+                if (data[1].equals("book")) {
+                    markup = bookPageReplyMarkup();
+                    editedText = "Выберите магазин";
+                }
+                if (data[1].equals("ocr")) {
+                    markup = ocrPageLangReplyMarkup();
+                    editedText = "Выберите язык текста на вашем изображении";
+                }
+            } else if (data[0].equals("book")) {
+                if (data[1].equals("back")) {
+                    markup = startCommandReplyMarkup();
+                    editedText = "Что нужно сделать?";
+                }
+            } else if (data[0].equals("ocr")) {
+                if (data[1].equals("back")) {
+                    markup = startCommandReplyMarkup();
+                    editedText = "Что нужно сделать?";
+                } else {
+                    userLangSetup.put(update.getCallbackQuery().getFrom().getId().toString(), data[1]);
+                    editedText = "Вы выбрали язык: " + data[1] +
+                            ". Теперь отправьте мне скриншот с текстом, который требуется оцифровать. " +
+                            "Либо вернитесь назад для выбора другого языка";
+                    markup = ocrPagePhotoWaitReplyMarkup();
+                }
+            } else if (data[0].equals("ocr2")) {
+                if (data[1].equals("back")) {
+                    markup = ocrPageLangReplyMarkup();
+                    editedText = "Выберите язык текста на вашем изображении";
+                }
+            }
+            if (markup != null) {
+                sendEditedMessage(editedText, markup, callbackQuery);
+            }
+        }
+    }
+
+    private void sendEditedMessage(String editedText, InlineKeyboardMarkup markup, CallbackQuery callbackQuery) {
+        EditMessageText editMessageText = EditMessageText
+                .builder()
+                .chatId(callbackQuery.getMessage().getChatId())
+                .inlineMessageId(callbackQuery.getInlineMessageId())
+                .text(editedText)
+                .messageId(callbackQuery.getMessage().getMessageId())
+                .replyMarkup(markup)
+                .build();
+        try {
+            execute(editMessageText);
+        } catch (TelegramApiException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private InlineKeyboardMarkup startCommandReplyMarkup() {
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        rowInline.add(InlineKeyboardButton.builder().text("\uD83D\uDCC7Перевести изображение в текст").callbackData("start:ocr").build());
+        List<InlineKeyboardButton> rowInline2 = new ArrayList<>();
+        rowInline2.add(InlineKeyboardButton.builder().text("\uD83D\uDCD6Купить книгу").callbackData("start:book").build());
+        rowsInline.add(rowInline);
+        rowsInline.add(rowInline2);
+        markupInline.setKeyboard(rowsInline);
+        return markupInline;
+    }
+
+    private InlineKeyboardMarkup ocrPageLangReplyMarkup() {
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        rowInline.add(InlineKeyboardButton.builder().text("Английский(ENG)").callbackData("ocr:eng").build());
+        List<InlineKeyboardButton> rowInline2 = new ArrayList<>();
+        rowInline2.add(InlineKeyboardButton.builder().text("Русский(RUS)").callbackData("ocr:rus").build());
+        List<InlineKeyboardButton> rowInline3 = new ArrayList<>();
+        rowInline3.add(InlineKeyboardButton.builder().text("⬅️Назад").callbackData("ocr:back").build());
+        rowsInline.add(rowInline);
+        rowsInline.add(rowInline2);
+        rowsInline.add(rowInline3);
+        markupInline.setKeyboard(rowsInline);
+        return markupInline;
+    }
+
+    private InlineKeyboardMarkup ocrPagePhotoWaitReplyMarkup() {
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        rowInline.add(InlineKeyboardButton.builder().text("⬅️Назад").callbackData("ocr2:back").build());
+        rowsInline.add(rowInline);
+        markupInline.setKeyboard(rowsInline);
+        return markupInline;
+    }
+
+    private InlineKeyboardMarkup bookPageReplyMarkup() {
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        rowInline.add(InlineKeyboardButton.builder().text("Book 24").url("https://book24.ru/r/UoTMv").build());
+        List<InlineKeyboardButton> rowInline2 = new ArrayList<>();
+        rowInline2.add(InlineKeyboardButton.builder().text("Читай-Город").url("https://www.chitai-gorod.ru/r/hoUBH").build());
+        List<InlineKeyboardButton> rowInline3 = new ArrayList<>();
+        rowInline3.add(InlineKeyboardButton.builder().text("Буквоед").url("https://www.bookvoed.ru/book?id=13564138").build());
+        List<InlineKeyboardButton> rowInline4 = new ArrayList<>();
+        rowInline4.add(InlineKeyboardButton.builder().text("Лабиринт").url("https://www.labirint.ru/books/920691/").build());
+        List<InlineKeyboardButton> rowInline5 = new ArrayList<>();
+        rowInline5.add(InlineKeyboardButton.builder().text("⬅️Назад").callbackData("book:back").build());
+        rowsInline.add(rowInline);
+        rowsInline.add(rowInline2);
+        rowsInline.add(rowInline3);
+        rowsInline.add(rowInline4);
+        rowsInline.add(rowInline5);
+        markupInline.setKeyboard(rowsInline);
+        return markupInline;
     }
 
     public void photoReceived(Update update) {
@@ -174,7 +301,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 resultFile.getPath(),
                 outputFile.getName(),
                 "-l",
-                users.get(update.getMessage().getChatId().toString()));
+                userLangSetup.get(update.getMessage().getChatId().toString()));
         pb.directory(resultFile.getParentFile());
         pb.redirectErrorStream(true);
         Process process = pb.start();
@@ -191,7 +318,18 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             in.close();
             sendMessage(update.getMessage().getChatId(), strB.toString());
-            sendInlineKeyboard(update);
+            SendMessage sendMessage = SendMessage
+                    .builder()
+                    .text("Что нужно сделать?")
+                    .chatId(update.getMessage().getChatId())
+                    .replyMarkup(startCommandReplyMarkup())
+                    .build();
+            try {
+
+                execute(sendMessage);
+            } catch (TelegramApiException e) {
+                throw new RuntimeException(e);
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
