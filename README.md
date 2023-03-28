@@ -15,6 +15,3 @@ To use the bot, simply add it to your Telegram contacts and start a conversation
 
 # Demo
 A real working example of the bot can be found at https://t.me/mitrofmepbot. Feel free to try it out and see how it works.
-
-# License
-This application is licensed under the MIT License.
