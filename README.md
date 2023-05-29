@@ -10,8 +10,5 @@ This is a Telegram bot that can extract text from images and return it as a mess
 # Stack
 The bot is built with Java 11 and Spring Boot. It is based on the [TelegramBots library](https://github.com/rubenlagus/TelegramBots), which provides a simple and flexible framework for building Telegram bots.
 
-# Usage
-To use the bot, simply add it to your Telegram contacts and start a conversation. You can send pictures to the bot, along with any text messages or commands that it supports.
-
 # Demo
 A real working example of the bot can be found at https://t.me/mitrofmepbot. Feel free to try it out and see how it works.
